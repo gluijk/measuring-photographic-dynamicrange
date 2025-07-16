@@ -213,11 +213,55 @@ List analyze_patches(NumericMatrix imgcrop, int NCOLS, int NROWS, double SAFE) {
 
 ################################
 
+# 0. BLACK AND SAT POINTS CALCULATION FROM DARKFRAME AND BLOWN RAW FILES
+
+# It is mandatory to use accurate BLACK (especially) and SAT values
+# to properly locate each pixel's level vs saturation
+
+# dcraw -v -D -t 0 -4 -T BLACK.DNG SAT.DNG
+imgblack=readTIFF("BLACK.tiff", as.is=TRUE)  # read unmodified integer RAW data
+imgsat=readTIFF("SAT.tiff", as.is=TRUE)  # read unmodified integer RAW data
+
+# BLACK level
+for (rawchan in c('R', 'G1', 'G2', 'B')) {
+    if (rawchan=='R') {
+        imgBayerB=imgblack[row(imgblack)%%2 & col(imgblack)%%2]
+        imgBayerS=imgsat[row(imgsat)%%2 & col(imgsat)%%2]        
+    } else if (rawchan=='G1') {
+        imgBayerB=imgblack[row(imgblack)%%2 & !col(imgblack)%%2]
+        imgBayerS=imgsat[row(imgsat)%%2 & !col(imgsat)%%2]        
+    } else if (rawchan=='G2') {
+        imgBayerB=imgblack[!row(imgblack)%%2 & col(imgblack)%%2]
+        imgBayerS=imgsat[!row(imgsat)%%2 & col(imgsat)%%2]        
+    } else if (rawchan=='B') {
+        imgBayerB=imgblack[!row(imgblack)%%2 & !col(imgblack)%%2]
+        imgBayerS=imgsat[!row(imgsat)%%2 & !col(imgsat)%%2]        
+    }
+ 
+    print(paste0(rawchan, " BLACK: median=",
+                 median(imgBayerB), ", mean=", mean(imgBayerB)))
+    freq_table=table(as.vector(imgBayerB))
+    write.csv2(freq_table, paste0("BLACK_freq_", rawchan, ".csv"))
+    
+    print(paste0(rawchan, " SAT: median=",
+                 median(imgBayerS), ", mean=", mean(imgBayerS)))
+    freq_table=table(as.vector(imgBayerS))
+    write.csv2(freq_table, paste0("SAT_freq_", rawchan, ".csv"))
+}
+
+# The conclusion is that the best:
+# BLACK is 255 (median) or 254.85 (floating point mean)
+# SAT   is 4095 for all 3 channels
+BLACK=mean(imgblack)  # 254.85
+
+
+################################
+
 # 1. EXTRACT RAW DATA AS 16-bit TIFF FILES READ THEM AND NORMALIZE
 
-# dcraw -v -D -t 0 *.DNG  # replace DNG for any camera RAW format
+# dcraw -v -D -t 0 -4 -T *.DNG  # replace DNG for any camera RAW format
 
-BLACK=256  # Olympus OM-1 black level
+BLACK=256  # Olympus OM-1 black level. Unfortunately we used 256 instead of 255 or 254.85
 SAT=4095  # Olympus OM-1 sat level
 
 filepath=getwd()
@@ -226,7 +270,7 @@ filenames=list.files(path=filepath, pattern="\\.tiff$",  # pattern="\\.tif{1,2}$
 filenamesISO=gsub(".tiff", "", filenames) 
 filenamesISO=toupper(gsub("^iso0*", "iso", filenamesISO))
 
-CairoPNG("SNRcurves.png", width=1920, height=1080)  # HQ Full HD curves
+CairoPNG("SNRcurvesBLACK254.85.png", width=1920, height=1080)  # HQ Full HD curves
 
 N=length(filenames)  # number of RAW files to process
 for (image in 1:N) {
@@ -249,7 +293,7 @@ for (image in 1:N) {
     
 # 2. EXTRACT INDIVIDUAL RAW CHANNEL(S) AND APPLY KEYSTONE CORRECTION
     
-    # Keep one RAW channel:
+    # Keep one RAW channel (criteria checked OK):
     imgBayer=img[row(img)%%2 & col(img)%%2]  # R
     # imgBayer=img[row(img)%%2 & !col(img)%%2]  # G1
     # imgBayer=img[!row(img)%%2 & col(img)%%2]  # G2
