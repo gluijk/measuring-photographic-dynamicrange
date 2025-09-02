@@ -3,4 +3,4 @@ Classic method to calcuate any camera sensor's dynamic range based on noise meas
 
 ![measuring-photographic-dynamicrange](/cropwithpatches_iso51200.jpg)
 
-![measuring-photographic-dynamicrange](/SNRcurves.png)
+![measuring-photographic-dynamicrange](/SNRcurvesBLACK254.85.png)
