@@ -270,7 +270,7 @@ filenames=list.files(path=filepath, pattern="\\.tiff$",  # pattern="\\.tif{1,2}$
 filenamesISO=gsub(".tiff", "", filenames) 
 filenamesISO=toupper(gsub("^iso0*", "iso", filenamesISO))
 
-CairoPNG("SNRcurves.png", width=1920, height=1080)  # HQ Full HD curves
+CairoPNG("SNRcurvesBLACK254.85.png", width=1920, height=1080)  # HQ Full HD curves
 
 N=length(filenames)  # number of RAW files to process
 for (image in 1:N) {
@@ -321,7 +321,7 @@ for (image in 1:N) {
         xtl=(xu[1] + xu[2]) / 2
         ytl=(yu[1] + yu[4]) / 2
         # bottom-right
-        xbr=(xu[3] + xu[3]) / 2
+        xbr=(xu[3] + xu[4]) / 2
         ybr=(yu[2] + yu[3]) / 2
         
         xd=c(xtl, xtl, xbr, xbr)
@@ -483,6 +483,5 @@ dev.off()
 # Print calculated DR for each ISO
 DR_df=DR_df[order(DR_df$tiff_file), ]
 print(DR_df)
-
 
 
