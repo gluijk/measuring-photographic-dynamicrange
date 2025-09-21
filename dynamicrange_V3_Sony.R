@@ -186,7 +186,8 @@ List analyze_patches(NumericMatrix imgcrop, int NCOLS, int NROWS,
       int sat = 0;
       for (double v : values) if (v > 0.9) sat++;
 
-      if (mean > 0 && 20 * log10(mean / stdev) >= MIN_SNR_dB && ((double)sat / values.size()) < 0.01) {
+      if (mean > 0 && 20 * log10(mean / stdev) >= MIN_SNR_dB && ((double)sat / values.size()) < 0.01
+        && 20 * log10(mean / stdev) >= 4 && 20 * log10(mean / stdev) <=20) {
       // if (mean > 0 && ((double)sat / values.size()) < 0.1) {
         Signal.push_back(mean);
         Noise.push_back(stdev);
@@ -252,8 +253,11 @@ normalize=FALSE  # TRUE
 drnormalization_mpx=8  # 8Mpx normalization
 
 # Number of patches in test chart
-NCOLS=10  # NCOLS=11
-NROWS=7  # NROWS=8
+NCOLS=11
+NROWS=7
+
+NCOLS=10
+NROWS=8
 
 
 
@@ -280,7 +284,7 @@ RGBMAX=max(R,G,B)
 # Gamma curve to otimize colour separation -> OPTIMIZE
 invgamma=1.4  # nonlinear colour scale factor (inverse gamma)
 
-# white circles radius -> CALCULATE EXACT SIZE FOR USED QUANTILE
+# white circles radius -> OPTIMIZE EXACT SIZE FOR USED QUANTILE
 RADIUS=15
 
 
@@ -315,7 +319,7 @@ OFFSETX=round((DIMX-DIMXc)/2)
 OFFSETY=round((DIMY-DIMYc)/2)
 chartfinal[(OFFSETY+1):(OFFSETY+DIMYc), (OFFSETX+1):(OFFSETX+DIMXc),]=chart
 
-# Add 4 WHITE circles
+# Add 4 WHITE circles: top-left, bottom-left, bottom-right, top-right
 x0=c(WIDTH,  WIDTH,       DIMX-WIDTH,  DIMX-WIDTH)
 y0=c(HEIGHT, DIMY-HEIGHT, DIMY-HEIGHT, HEIGHT)
 for (i in 1:4) {
@@ -327,13 +331,9 @@ for (i in 1:4) {
 }
 
 # Write chart
-# writeTIFF(chart, "magentachart.tif", bits.per.sample=16)
 CHARTNAME=paste0("magentachart_", NCOLS, "x", NROWS, "_",
                  round(Format,2), "_", invgamma*10, ".png")
 writePNG(chartfinal, CHARTNAME)
-
-
-
 
 
 ################################
@@ -375,6 +375,7 @@ for (rawchan in c('R', 'G1', 'G2', 'B')) {
 }
 
 BLACK=mean(imgblack)  # 512.178 (Sony A7 IV) / 254.85 (Olympus OM-1)
+BLACKV=c(512.177394540242, 512.154956138962, 512.143174113528, 512.236610063994)
 SAT=median(imgsat)  # 16383
 
 
@@ -396,12 +397,15 @@ filenamesISO=gsub(".tiff", "", filenames)
 filenamesISO=toupper(gsub("^iso0*", "iso", filenamesISO))
 
 ZOOM=1
-CairoPNG("SNRcurves_OLED_NOCHE_patchratio0.5.png", width=1920*ZOOM, height=1080*ZOOM)  # HQ Full HD curves
+NAME=paste0("SNRcurves_patchratio", patch_ratio, "_",
+    ifelse(normalize, paste0(drnormalization_mpx, "Mpx"), "perpixel"), "_R.png")
+CairoPNG(NAME, width=1920*ZOOM, height=1080*ZOOM)  # HQ Full HD curves
 
+# Loop through all files
 N=length(filenames)  # number of RAW files to process
 for (image in 1:N) {
     NAME=filenames[image]
-    cat(paste0('Processing "', NAME, '" ...\n'))
+    cat(paste0('Processing "', NAME, '"...\n'))
     
     # Read RAW data
     img=readTIFF(NAME, as.is=TRUE)  # read unmodified integer RAW data
@@ -409,7 +413,8 @@ for (image in 1:N) {
     # abline(v=BLACK, col='red')
     
     # Normalize to floating point 0..1 range (negative values are allowed)
-    img=img-BLACK
+    # img=img-BLACK
+    img=img-BLACKV[1]
     img=img/(SAT-BLACK)
     # hist(img, breaks=800)
     # abline(v=0, col='red')
@@ -420,24 +425,24 @@ for (image in 1:N) {
 # 2. EXTRACT INDIVIDUAL RAW CHANNEL(S) AND APPLY KEYSTONE CORRECTION
     
     # Correct keystone distortion
-    if (image==1) {  # things that we do only once
-        # Get camera resolution in Mpx
+    if (image==1) {  # all those things that we do only once
+        # Obtain camera resolution in Mpx
         camresolution_mpx=nrow(img)*ncol(img)/1e6
         
         # Calculate k for all keystone corrections
 
-        # These are hard coded coordinates -> will be ignored
-        # Distorted points (source) - Olympus OM-1
-        xu=c(119, 99, 2515, 2473)  # top-left, bottom-left, bottom-right, top-right
-        yu=c(170, 1687, 1679, 158)
-        
-        # Distorted points (source) - Sony A7 IV
-        xu=c(619, 608,  2924, 2907)  # top-left, bottom-left, bottom-right, top-right
-        yu=c(322, 1913, 1907, 317)
- 
-        # Distorted points (source) - Sony A7 IV NOCHE
-        xu=c(814, 814,  2753, 2753)  # top-left, bottom-left, bottom-right, top-right
-        yu=c(490, 1833, 1833, 490)
+        # # These are hard coded coordinates -> will be ignored
+        # # Distorted points (source) - Olympus OM-1
+        # xu=c(119, 99, 2515, 2473)  # top-left, bottom-left, bottom-right, top-right
+        # yu=c(170, 1687, 1679, 158)
+        # 
+        # # Distorted points (source) - Sony A7 IV
+        # xu=c(619, 608,  2924, 2907)  # top-left, bottom-left, bottom-right, top-right
+        # yu=c(322, 1913, 1907, 317)
+        # 
+        # # Distorted points (source) - Sony A7 IV NOCHE
+        # xu=c(814, 814,  2753, 2753)  # top-left, bottom-left, bottom-right, top-right
+        # yu=c(490, 1833, 1833, 490)
         
         # Extract G channel for keystone correction -> obtain circles coordinates
         # IMPORTANT NOTE: some cameras are GB/RG
@@ -451,22 +456,24 @@ for (image in 1:N) {
         DIMX=ncol(imgBayer)
         DIMY=nrow(imgBayer)
         
-        for (sector in 1:4) {  # loop through 4 quadrants
+        xu=c(NA, NA, NA, NA)
+        yu=c(NA, NA, NA, NA)
+        for (sector in 1:4) {  # loop through 4 sectors (=quadrants)
             # 1: top-left, 2: bottom-left, 3: bottom-right, 4: top-right
             if (sector==1) imgsector=imgBayer[1:round(DIMY/2), 1:round(DIMX/2)]
             if (sector==2) imgsector=imgBayer[round(DIMY/2+1):DIMY, 1:round(DIMX/2)]
             if (sector==3) imgsector=imgBayer[round(DIMY/2+1):DIMY, round(DIMX/2+1):DIMX]
             if (sector==4) imgsector=imgBayer[1:round(DIMY/2), round(DIMX/2+1):DIMX]
 
-            # 1. Threshold for top 0.5% brightest pixels
+            # Threshold for top 0.5% brightest pixels
             THRESHOLD=0.995  # 0.9995 -> top 0.05% brightest pixels
             q <- quantile(imgsector, probs = THRESHOLD)
             
-            # 2. Coordinates of pixels above threshold
+            # Coordinates of pixels above threshold
             coords <- which(imgsector >= q, arr.ind = TRUE)
-            imgsector[coords]=1  # mark as 1 used pixels that participated
+            imgsector[coords]=1  # mark as 1 pixels that participated in calculation
             
-            # 3. Median coordinates, rounded
+            # Median coordinates, rounded
             center_y <- round(median(coords[, 1]))
             center_x <- round(median(coords[, 2]))
             
@@ -500,7 +507,6 @@ for (image in 1:N) {
         writeTIFF(imgBayer, paste0(NAME, "_cornersdetection.tif"), bits.per.sample=16)
         
         # Undistorted points (destination): (floating point values)
-        
         # top-left
         xtl=(xu[1] + xu[2]) / 2
         ytl=(yu[1] + yu[4]) / 2
@@ -511,125 +517,134 @@ for (image in 1:N) {
         xd=c(xtl, xtl, xbr, xbr)
         yd=c(ytl, ybr, ybr, ytl)
         
-        k=calculate_keystone(xu, yu, xd, yd, DIMX, DIMY)
+        keystone=calculate_keystone(xu, yu, xd, yd, DIMX, DIMY)
     }
     
-    # Keep one RAW channel -> PENDING IMPROVEMENT: LOOP THROUGH 4 RAW CHANNELS
-    imgBayer=img[row(img)%%2 & col(img)%%2]  # R
-    # imgBayer=img[row(img)%%2 & !col(img)%%2]  # G1
-    # imgBayer=img[!row(img)%%2 & col(img)%%2]  # G2
-    # imgBayer=img[!row(img)%%2 & !col(img)%%2]  # B
-    dim(imgBayer)=dim(img)/2
-    DIMX=ncol(imgBayer)
-    DIMY=nrow(imgBayer)
+    Signal=c()  # empty vectors for current image
+    Noise=c()
+    patches_used=c(0,0,0,0)  # samples count
+    for (rawchan in 1:4) {
+        # Loop through all 4 RAW channels
+        if (rawchan==1) imgBayer=img[row(img)%%2 & col(img)%%2]  # R
+        if (rawchan==2) imgBayer=img[row(img)%%2 & !col(img)%%2]  # G1
+        if (rawchan==3) imgBayer=img[!row(img)%%2 & col(img)%%2]  # G2
+        if (rawchan==4) imgBayer=img[!row(img)%%2 & !col(img)%%2]  # B
+        dim(imgBayer)=dim(img)/2
+        DIMX=ncol(imgBayer)
+        DIMY=nrow(imgBayer)
     
-    # Save uncorrected but normalized image
-    # imgsave=imgBayer
-    # imgsave[imgsave<0]=0
-    # writeTIFF(imgsave, paste0("uncorrectednormalizedchart_", NAME, ".tif"), bits.per.sample=16)
-    # rm(imgsave)
+        # Save uncorrected but normalized image
+        # imgsave=imgBayer
+        # imgsave[imgsave<0]=0
+        # writeTIFF(imgsave, paste0("uncorrectednormalizedchart_", NAME, ".tif"), bits.per.sample=16)
+        # rm(imgsave)
     
-    imgc=undo_keystone_cpp(imgBayer, k)
+        # Correct keystone distortion
+        imgc=undo_keystone_cpp(imgBayer, keystone)
 
-    # benchmark_results=microbenchmark(
-    #     Cpp_loops_old=undo_keystone_cpp_old(imgBayer, k),
-    #     Cpp_loops=undo_keystone_cpp(imgBayer, k),
-    #     times=30
-    # )
-    # benchmark_results
-    # boxplot(benchmark_results)
-    
-    # Unit: milliseconds
-    # expr        min          lq       mean     median         uq        max neval
-    # R_loops 24111.0131 24253.91095 24385.2646 24273.2952 24365.5697 25671.9213    15
-    # Cpp_loops    98.4014    98.96145   101.4232   100.1011   101.5062   116.5063    15
-    
-    # Save corrected image
-    # imgsave=imgc
-    # imgsave[imgsave<0]=0
-    # writeTIFF(imgsave, paste0("correctedchart_", NAME, ".tif"), bits.per.sample=16)
-    # rm(imgsave)
+        # benchmark_results=microbenchmark(
+        #     Cpp_loops_old=undo_keystone_cpp_old(imgBayer, k),
+        #     Cpp_loops=undo_keystone_cpp(imgBayer, k),
+        #     times=30
+        # )
+        # benchmark_results
+        # boxplot(benchmark_results)
+        
+        # Unit: milliseconds
+        # expr        min          lq       mean     median         uq        max neval
+        # R_loops 24111.0131 24253.91095 24385.2646 24273.2952 24365.5697 25671.9213    15
+        # Cpp_loops    98.4014    98.96145   101.4232   100.1011   101.5062   116.5063    15
+        
+        # Save corrected image
+        # imgsave=imgc
+        # imgsave[imgsave<0]=0
+        # writeTIFF(imgsave, paste0("correctedchart_", NAME, ".tif"), bits.per.sample=16)
+        # rm(imgsave)
     
     
 ################################
     
 # 3. READ PATCHES TO FORM 7x11 GRID AND COLLECT (EV,SNR) PAIRS
     
-    # Crop patches area dropping corner marks (that are 1 patch away)
-    # NCOLS=11 vs NROWS=7
-    GAPX=(xbr-xtl)/(NCOLS+2)
-    GAPY=(ybr-ytl)/(NROWS+2)
-    imgcrop=imgc[round(ytl+GAPY):round(ybr-GAPY), round(xtl+GAPX):round(xbr-GAPX)]
+        # Crop patches area dropping corner marks (that are 1 patch away)
+        GAPX=(xbr-xtl)/(NCOLS+2)
+        GAPY=(ybr-ytl)/(NROWS+2)
+        imgcrop=imgc[round(ytl+GAPY):round(ybr-GAPY), round(xtl+GAPX):round(xbr-GAPX)]
     
-    # Save corrected and cropped image
-    imgsave=imgcrop
-    imgsave[imgsave<0]=0
-    writeTIFF(imgsave, paste0("correctedcroppedchart_", NAME, ".tif"), bits.per.sample=16)
-    rm(imgsave)
+        # Save corrected and cropped image
+        imgsave=imgcrop
+        imgsave[imgsave<0]=0
+        writeTIFF(imgsave, paste0("correctedcroppedchart_", rawchan, "_", NAME, ".tif"), bits.per.sample=16)
+        rm(imgsave)
 
-    # Analyze imgcrop dividing it in NCOLS x NROWS patches leaving a SAFE guard
-    # DIMX=ncol(imgcrop)
-    # DIMY=nrow(imgcrop)
-    # for (i in 1:NCOLS) {
-    #     for (j in 1:NROWS) {
-    #         x1=round((i-1)*DIMX/NCOLS + SAFE)
-    #         x2=round( i   *DIMX/NCOLS - SAFE)
-    #         y1=round((j-1)*DIMY/NROWS + SAFE)
-    #         y2=round( j   *DIMY/NROWS - SAFE)
-    #         patch=which(row(imgcrop)>=y1 & row(imgcrop)<=y2 & 
-    #                     col(imgcrop)>=x1 & col(imgcrop)<=x2)
-    #         values=imgcrop[patch]
-    #         S=mean(values)  # S=mean
-    #         N=var(values)^0.5  # N=stdev
-    #         
-    #         # Ignore patches with negative average values, SNR < -10dB or
-    #         # >1% of saturated/nonlinear (>90%) values
-    #         if (S>0 & 20*log10(S/N) >= -10 & length(values[values>0.9])/length(values)<0.01) {
-    #             Signal=c(Signal,S)
-    #             Noise=c(Noise, N)
-    #             
-    #             # Draw patch rectangle
-    #             imgcrop[y1:y2,x1]=0
-    #             imgcrop[y1:y2,x2]=0
-    #             imgcrop[y1,x1:x2]=0
-    #             imgcrop[y2,x1:x2]=0
-    #             
-    #             imgcrop[y1:y2,(x1-1)]=1
-    #             imgcrop[y1:y2,(x2+1)]=1
-    #             imgcrop[(y1-1),x1:x2]=1
-    #             imgcrop[(y2+1),x1:x2]=1
-    #         }
-    # 
-    #     }
-    # }
-    MIN_SNR_dB = -10
-    if (normalize) MIN_SNR_dB = MIN_SNR_dB - 20*log10((camresolution_mpx / drnormalization_mpx)^(1/2))
-    calc=analyze_patches(imgcrop, NCOLS, NROWS, patch_ratio, MIN_SNR_dB)  # SAFE=80
-    Signal=calc$Signal
-    Noise=calc$Noise
+        # Analyze imgcrop dividing it in NCOLS x NROWS patches leaving a SAFE guard
+        # DIMX=ncol(imgcrop)
+        # DIMY=nrow(imgcrop)
+        # for (i in 1:NCOLS) {
+        #     for (j in 1:NROWS) {
+        #         x1=round((i-1)*DIMX/NCOLS + SAFE)
+        #         x2=round( i   *DIMX/NCOLS - SAFE)
+        #         y1=round((j-1)*DIMY/NROWS + SAFE)
+        #         y2=round( j   *DIMY/NROWS - SAFE)
+        #         patch=which(row(imgcrop)>=y1 & row(imgcrop)<=y2 & 
+        #                     col(imgcrop)>=x1 & col(imgcrop)<=x2)
+        #         values=imgcrop[patch]
+        #         S=mean(values)  # S=mean
+        #         N=var(values)^0.5  # N=stdev
+        #         
+        #         # Ignore patches with negative average values, SNR < -10dB or
+        #         # >1% of saturated/nonlinear (>90%) values
+        #         if (S>0 & 20*log10(S/N) >= -10 & length(values[values>0.9])/length(values)<0.01) {
+        #             Signal=c(Signal,S)
+        #             Noise=c(Noise, N)
+        #             
+        #             # Draw patch rectangle
+        #             imgcrop[y1:y2,x1]=0
+        #             imgcrop[y1:y2,x2]=0
+        #             imgcrop[y1,x1:x2]=0
+        #             imgcrop[y2,x1:x2]=0
+        #             
+        #             imgcrop[y1:y2,(x1-1)]=1
+        #             imgcrop[y1:y2,(x2+1)]=1
+        #             imgcrop[(y1-1),x1:x2]=1
+        #             imgcrop[(y2+1),x1:x2]=1
+        #         }
+        # 
+        #     }
+        # }
+        
+        MIN_SNR_dB = -10
+        if (normalize) MIN_SNR_dB = MIN_SNR_dB - 20*log10((camresolution_mpx / drnormalization_mpx)^(1/2))
+        
+        calc=analyze_patches(imgcrop, NCOLS, NROWS, patch_ratio, MIN_SNR_dB)
+        Signal=c(Signal, calc$Signal)
+        Noise=c(Noise, calc$Noise)
+        
+        imgcrop=calc$imgcrop
+        imgsave=imgcrop
+        imgsave[imgsave<0]=0
+        writeTIFF(imgsave, paste0("croppedchart_usedpatches_", rawchan, "_", NAME, ".tif"), bits.per.sample=16)
+        rm(imgsave)
+        
+        patches_used[rawchan]=length(calc$Signal)  # total number of samples used in rawchan      
+        
+    }  # end loop through RAW channels
+    
+    # Now order ALL samples from lower to higher SNR values (to plot beautifully)
     SNR=Signal/Noise
-    # SNR normalization to drnormalization_mpx Mpx
-    # Linear: SNR_norm = SNR_perpixel * (Mpx / 8)^(1/2)
-    # Log:    SNR_norm dB = SNR_perpixel dB + 20 * log10[(Mpx / 8)^(1/2)]
-    if (normalize) SNR = SNR * (camresolution_mpx / drnormalization_mpx)^(1/2)
-    
-    imgcrop=calc$imgcrop
-    patches_used=length(Signal)
-
-    # Order from lower to higher SNR values (to plot beautifully)
     neworder=order(SNR)  # SNR will be the independent variable in splines
     Signal=Signal[neworder]
     Noise=Noise[neworder]
     SNR=SNR[neworder]
-    
-    imgsave=imgcrop
-    imgsave[imgsave<0]=0
-    writeTIFF(imgsave, paste0("croppedchart_usedpatches_", NAME, ".tif"), bits.per.sample=16)
-    rm(imgsave)
-    
-    # SNR cuves in dB
+    # SNR normalization to drnormalization_mpx Mpx
+    # Linear: SNR_norm = SNR_perpixel * (Mpx / 8)^(1/2)
+    # Log:    SNR_norm dB = SNR_perpixel dB + 20 * log10[(Mpx / 8)^(1/2)]
+    if (normalize) SNR = SNR * (camresolution_mpx / drnormalization_mpx)^(1/2)
+
+    # SNR curves in dB: we'll plot blue scatter points and red curves
     if (image==1) {
-        plot(log2(Signal), 20*log10(SNR), xlim=c(-16,0), ylim=c(-15,25),
+        # plot(log2(Signal), 20*log10(SNR), xlim=c(-16,0), ylim=c(-15,25),
+        plot(log2(Signal), 20*log10(SNR), xlim=c(-14,-9), ylim=c(4,20),
              pch=16, cex=0.5, col='blue',
              # main='SNR curves - Olympus OM-1',
              main='SNR curves - Sony A7 IV',
@@ -682,11 +697,17 @@ for (image in 1:N) {
     if (image==1) {
         DR_df=data.frame(tiff_file=NAME,
                          DR_EV_12dB=DR_EV[1], DR_EV_0dB=DR_EV[2],
-                         patches_used=patches_used)        
+                         samples_R =patches_used[1],
+                         samples_G1=patches_used[2],
+                         samples_G2=patches_used[3],
+                         samples_B =patches_used[4])        
     } else {
         new_row=data.frame(tiff_file=NAME,
                            DR_EV_12dB=DR_EV[1], DR_EV_0dB=DR_EV[2],
-                           patches_used=patches_used)
+                           samples_R =patches_used[1],
+                           samples_G1=patches_used[2],
+                           samples_G2=patches_used[3],
+                           samples_B =patches_used[4])
         DR_df=rbind(DR_df, new_row)
     }
 }
