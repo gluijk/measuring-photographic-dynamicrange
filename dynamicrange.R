@@ -412,7 +412,7 @@ for (image in 1:N) {
     writeTIFF(imgsave, paste0("croppedchart_usedpatches_", NAME, ".tif"), bits.per.sample=16)
     rm(imgsave)
     
-    # SNR cuves in dB
+    # SNR curves in dB: we'll plot blue scatter points and red curves
     if (image==1) {
         plot(log2(Signal), 20*log10(SNR), xlim=c(-14,0), ylim=c(-10,20),
              pch=16, cex=0.5, col='blue',
